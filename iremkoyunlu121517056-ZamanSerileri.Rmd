@@ -1,0 +1,394 @@
+---
+title: "Zaman Serileri Analizi Vize"
+author: "Irem Koyunlu 121517056"
+date: "09 12 2020"
+output:
+  html_document:
+    toc: yes
+  word_document:
+    toc: yes
+---
+<style>
+/* Your other css */
+    body {
+      background-image: url(https://www.wallpapertip.com/wmimgs/79-792642_pastel-blue-and-yellow.jpg);
+      background-position: center center;
+      background-attachment: fixed;
+      background-repeat: no-repeat;
+      background-size: 100% 100%;
+    }
+.section .reveal .state-background {
+    background-image: url(https://www.wallpapertip.com/wmimgs/79-792642_pastel-blue-and-yellow.jpg);
+    background-position: center center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    background-size: 100% 100%;
+}
+</style>
+
+<style>
+div.blue pre.r { background-color:lightblue; }
+</style>
+
+<div class = "blue">
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# **ZAMAN SERILERI ANALIZI**
+# **LONDRA HEATHROW YAGISLARI 2010-2019 HER GUN ICIN YAGIS VE ORTALAMA SICAKLIK**
+# Kaynak :https://www.kaggle.com/emafuma/ncei-heathrow-2010-2019
+
+```{r , echo=FALSE, message=FALSE, warning=FALSE}
+knitr::include_graphics("sicaklik.jpg")
+```
+
+## VERI SETI ACIKLAMASI;
+
+Heathrow Havalimani, Ingiltere'nin baskenti Londra'daki altinci ana havalimanindan biridir. Uluslararasi yolcu trafigine gore dunyanin en islek birinci, toplam yolcu trafigine gore ise dunyanin en islek ucuncu havalimanidir Londra'nin 20 mil batisindadir.
+Mevcut veri seti, Ocak 2010'den Aralik 2019'ye kadar Londra Heathrow'da her gun icin yagis ve ortalama gunluk sicakliklari sicakliklari icerir.
+
+Buradaki fikir, gercek veriler uzerinde kolay ama etkili gorsellestirmelerle deneyler icin kullanilacak cok basit bir zaman serisi veri kumesine sahip olmaktir.
+Veri seti Ulusal Cevresel Bilgi Merkezleri'nden (NCEI) indirilmistir.
+
+## DEGISKENLER;
+
+* DATE: Veri setimizdeki ilgilenilen tarih.
+
+* TAVG: Veri setimizdeki ilgilenilen ortalama sicaklik.
+
+* PRCP: Veri setimizdeki yagis miktari.
+
+```{r message=FALSE, warning=FALSE}
+library(readr)
+library(dplyr)
+library(fpp2)
+veri <- read.csv("C:/Users/CASPER/Desktop/NCEI Heathrow Meteo Data 2010-2019.csv",header = T)
+
+veri=veri%>%select(c("DATE","TAVG"))
+head(veri,10)
+```
+
+Oncelikle verimizi ozetleyelim ;
+
+```{r message=FALSE, warning=FALSE}
+summary(veri)
+```
+
+Verimizdeki DATE degiskenindeki tarihlerimizi Ay ve Yil olarak ayirarak yeni sutunlar olusturalim group_by komutu ile  gruplandirip yeni sutunlari verimize ekleyelim ;
+
+```{r message=FALSE, warning=FALSE}
+veri$Month<-lubridate::month(veri$DATE)
+veri$Year<-lubridate::year(veri$DATE)
+veri%>%group_by(Year,Month)%>%summarise(TAVG = mean(TAVG))->VeriMonth
+head(VeriMonth,10)
+```
+
+Simdi olusturdugumuz verimizin ozetine bakalim;
+
+```{r message=FALSE, warning=FALSE}
+summary(VeriMonth)
+```
+
+Aylik bir veri olusturdugumuz icin frequency=12 alarak verimizi ts komutu ile zaman serisine ceviriyoruz;
+
+```{r message=FALSE, warning=FALSE}
+VeriMonth<-ts(VeriMonth[,3],start=c(2010,1),frequency =12)
+VeriMonth
+```
+
+Verimizin classini kontrol edelim , verimiz zaman serisine cevrildi ise sonucumuz ts olarak cikmalidir.
+
+```{r message=FALSE, warning=FALSE}
+class(VeriMonth)
+```
+
+# **SORU-1:**
+
+**Veri setinize iliskin zaman serisi grafigini cizdiriniz. Veri setinizde trend ve mevsimsellik var midir? Eger mevsimsellik oldugunu dusunuyorsaniz ilgili mevsimsellik grafiklerini (seasonal plot) cizdiriniz. Yorumlayiniz.**
+
+Oncelikle olusturdugumuz zaman serisi icin yila ve sicakliga gore Aylik Ortalama Hava Sicakliklari grafigini cizdirelim ve bu zaman serisi grafigini aciklayalim;
+
+```{r message=FALSE, warning=FALSE}
+library(fpp2) #Zaman serisi kutuphanesi
+```
+
+```{r message=FALSE, warning=FALSE}
+autoplot(VeriMonth) +
+ggtitle("Aylik ortalama Hava Sicakliklari") +
+xlab("Yil") +
+ylab("Sicaklik")
+```
+
+Cizdirdigimiz bu grafige baktigimizda mevsimsellik oldugunu gormekteyiz fakat trend ile ilgili kesin bir bilgi soyleyemeyiz.Trend ile ilgili kesin bir bilgi soyleyebilmek icin  zaman serisi regresyon modeli kurarak trende bakabiliriz.
+
+Aylik verimiz ile yillara karsi sicakliklar icin Aylik Ortalama Hava Sicakliklari Seasonal Plotunu cizdirelim;
+
+```{r message=FALSE, warning=FALSE}
+ggseasonplot(VeriMonth, year.labels=TRUE, year.labels.left=TRUE) +
+ylab("Sicaklik") +
+ggtitle("Seasonal Plot :Aylik Ortalama Hava Sicakliklari")
+```
+
+Aylik Ortalama Hava Sicakliklari Seasonal Plotuna baktigimizda her senede ayni hareket goruldugunden guclu bir mevsimsellik vardir.
+Her senenin basinda sicaklik dusuk olarak baslayip ve senenin ortasina dogru ise sicaklik yukselmekte ve senenin sonuna dogru sicaklik yeniden dususe gecmektedir.
+
+Aylik verimiz ile yillara karsi sicakliklar icin Aylik Ortalama Hava Sicakliklari Seasonal Plotunu farkli bir gorsellestirilmis halini cizdirelim;
+
+```{r message=FALSE, warning=FALSE}
+ggseasonplot(VeriMonth,polar=TRUE, year.labels=TRUE, year.labels.left=TRUE) +
+ylab("Sicaklik") +
+ggtitle("Seasonal Plot :Aylik Ortalama Hava Sicakliklari")
+```
+
+Aylik Ortalama Hava Sicakliklari Seasonal Plotuna baktigimizda her senede ayni hareket goruldugunden guclu bir mevsimsellik vardir.
+Her senenin basinda sicaklik dusuk olarak baslayip ve senenin ortasina dogru ise sicaklik yukselmekte ve senenin sonuna dogru sicaklik yeniden dususe gecmektedir.
+Ayriyeten bu grafige baktigimizda en icteki daire en gecmis yili yani baslangic yilini, en distaki daire ise en yakin yili gostermektedir.
+
+# **SORU-2:**
+
+**Verinize iliskin otokorelasyon (ACF) grafigi cizdiriniz ve yorumlayiniz.**
+
+Oncelikle verimiz icin Otokorelasyon (ACF) grafigini cizdirelim;
+
+```{r message=FALSE, warning=FALSE}
+ggAcf(VeriMonth)
+```
+
+Bu grafigimize baktigimizda birinci lag orjinal seri ile bir gecikmeli arasindaki otokorelasyonu gostermektedir ve oldukca yuksek cikmistir.
+Altinci lagte ise Ocak ile Haziranin karsilastigi yer negatif otokorelasyonun en cok oldugu yerdir cunku kis ile yaz mevsimleri birbirlerine denk gelmektedir.
+Neredeyse butun lagler mavi sinir cizgisini gectigi icin otokorelasyon vardir. Grafige baktigimizda mevsimsellikte gorulmektedir.
+
+# **SORU-3:**
+
+**Verinizi egitim ve test (train, test) olarak iki parcaya ayirin.**
+
+Simdi de verimizi test ve train olarak ayiralim;
+
+```{r message=FALSE, warning=FALSE}
+data_train<-window(VeriMonth,end=c(2017,12))
+data_test<-window(VeriMonth, start=2019)
+```
+
+## a)	
+
+**Egitim setinizi, ortalama, naive, box-cox donusumlu naive metod (veri setinize uygun olan naive metod) kullanarak modelleyiniz.**
+
+Oncelikle ortalama ve naive metodu kullanarak 24 gozlemli tahmin yapip yillara karsilik sicakliklarin Aylik Ortalama Sicaklik Degerleri Icin Tahminler grafigini cizdirelim.
+Veri setimiz mevsimsel oldugundan uygun olan metodu seasonal naive olarak kullanacagiz.
+
+```{r message=FALSE, warning=FALSE}
+autoplot(data_train) +
+autolayer(meanf(data_train, h=24), #Ortalama yontemi ile 24 gozlemli tahmin yapalim.
+series="Mean", PI=FALSE) + #Guven araligini gostermemek icin PI=FALSE yaptik.
+autolayer(rwf(data_train,h=24,drift=TRUE),  #Driftli naive yontemi ile 24 gozlemli tahmin yapalim.
+series="Naive",PI=FALSE) +
+autolayer(snaive(data_train,h=24,drift=TRUE),  #Driftli Seasonal Naive yontemi ile 24 gozlemli tahmin yapalim.
+series="Seasonal Naive", PI=FALSE) +
+ggtitle("Aylik Ortalama Sicaklik Degerleri Icin Tahminler") +
+xlab("Yil") + ylab("Sicaklik") +
+guides(colour=guide_legend(title="Forecast")) #Forecast: Ileriye yonelik tahmin.
+```
+
+Grafigimize baktigimizda verimiz icin en uygun tahmin edici yonteminin Seasonal Naive oldugunu gormekteyiz.
+Ayni zamanda verimizin trendi cok dusuk oldugu icin driftimiz yani egimimiz cok dusuktur.
+
+## b)	
+
+**Bu uc modelin test seti uzerindeki performansini gosteren zaman serisi grafigi cizdiriniz.**
+
+Oncelikle train seti uzerinde kurdugumuz modelleri test veri seti uzerindeki tahminlerini inceleyelim. 
+
+```{r message=FALSE, warning=FALSE}
+fit1<-meanf(data_train, h=24) #24 gozlem tahmin edelim.
+fit2<-rwf(data_train, h=24, drift=TRUE)
+fit3<-snaive(data_train,h=24)
+autoplot(VeriMonth) +
+autolayer(fit1, series="Mean",PI=FALSE) +
+autolayer(fit2, series="Naive",PI=FALSE) +
+autolayer(fit3, series="Seasonal Naive") + 
+xlab("Yil") + ylab("Sicaklik") +
+guides(colour=guide_legend(title="Forecast"))
+```
+
+Grafigimize baktigimizda verimiz icin en uygun tahmin edici yonteminin Seasonal Naive oldugunu gormekteyiz.
+
+## c)
+
+**Modellerin test seti uzerindeki performanslarini MAPE ve RMSE kriterlerine gore kiyaslayiniz.**
+
+Ortalama yontemi kullanilarak test veri seti uzerinden accuracy tahmin degerlerine bakalim;
+
+```{r message=FALSE, warning=FALSE}
+accuracy(fit1, data_test)
+```
+
+Ortalama yontemi kullanilarak test veri seti uzerinden accuracy tahmin degerlerine baktigimizda MAPE degerimiz 40.81577 ve RMSE degerimiz 4.799090 cikmistir.
+
+Driftli Naive yontemi kullanilarak test veri seti uzerinden accuracy tahmin degerlerine bakalim;
+
+```{r message=FALSE, warning=FALSE}
+accuracy(fit2, data_test)
+```
+
+Driftli Naive yontemi kullanilarak test veri seti uzerinden accuracy tahmin degerlerine baktigimizda MAPE degerimiz 37.87503 ve RMSE degerimiz 7.022331 cikmistir.
+
+Seasonal Naive yontemi kullanilarak test veri seti uzerinden accuracy tahmin degerlerine bakalim;
+
+```{r message=FALSE, warning=FALSE}
+accuracy(fit3, data_test)
+```
+
+Seasonal Naive  yontemi kullanilarak test veri seti uzerinden accuracy tahmin degerlerine baktigimizda MAPE degerimiz 10.32240 ve RMSE degerimiz 1.279615 cikmistir.
+
+Bu uc basit tahmin yontemlerine baktigimizda training set uzerinde ME yani errorlarin ortalamasi 0 veya 0'a cok yakin olmalidir.
+Test veri seti uzerinde baktigimizda ise ME disindaki diger tum sonuclarin en dusuk oldugu model alinmalidir.
+
+MAPE ve RMSE degerlerimizin en dusuk sonuclari verdigi modelimiz Seasonal Naive yontemi kullanilarak olusturulan fit3 modelimizde elde edilmistir.Ayrica cogunluk olarak en dusuk sonuclar Seasonal Naive yontemi kullanilarak olusturulan fit3 modelimizde elde edilmistir.
+
+## d) 
+
+**Modellerin performansini, training seti cross validation artiklari (h=1 adim) uzerinden hesaplanan RMSE degerlerine gore karsilastiriniz.**
+
+Simdi ise bu uc model icin Cross Validation uzerinden RMSE degerlerini hesaplayalim; 
+
+```{r message=FALSE, warning=FALSE}
+e <- tsCV(data_train, meanf, h=1)
+RMSEmean<-sqrt(mean(e^2, na.rm=TRUE))
+RMSEmean
+```
+
+Ortalama yontemi kullanilarak Cross Validation yardimi ile olusturulan RMSE degerimiz 5.036018 cikmistir.
+
+```{r message=FALSE, warning=FALSE}
+e <- tsCV(data_train, rwf, drift=TRUE, h=1)
+RMSEnaive<-sqrt(mean(e^2, na.rm=TRUE))
+RMSEnaive
+```
+
+Driftli Naive yontemi kullanilarak Cross Validation yardimi ile olusturulan RMSE degerimiz 3.015475 cikmistir.
+
+```{r message=FALSE, warning=FALSE}
+e <- tsCV(data_train, snaive, h=1)
+RMSEsnaive<-sqrt(mean(e^2, na.rm=TRUE))
+RMSEsnaive
+```
+
+Seasonal Naive yontemi kullanilarak Cross Validation yardimi ile olusturulan RMSE degerimiz 4.176422 cikmistir.
+
+Modellerin performansini, training seti cross validation artiklari (h=1 adim) uzerinden hesaplanan RMSE degerlerine gore karsilasilastirdigimiz da en dusuk RMSE degerimiz  Driftli Naive yontemi kullanilarak Cross Validation yardimi ile olusturulan RMSE degerimiz cikmistir.
+
+## e)
+
+**Naive modelin artiklari icin otokorelasyon varsayimini, uygun gecikme sayisi belirledikten sonra Portmanteau testler yardimiyla test ediniz.**
+
+Verimizde Naive artiklari icin checkresiduals komutu ile sacilim grafigi , otokorelasyon grafigi ve normal dagilimin grafigini cizdirelim. Ayni zamanda bu komut bize Ljung-Box Test sonucunu da verir.
+
+```{r message=FALSE, warning=FALSE}
+checkresiduals(rwf(data_train,drift=TRUE))
+```
+
+* 1. Grafik Artiklarin Sacilim Grafigidir.Grafige baktigimizda Artiklar 0 etrafinda rastgele dagilmaktadir.Bu grafikte trend gozukmemektedir.
+
+* 2. Grafik Artiklarin Otokorelasyon Grafigidir.Grafige baktigimizda laglerden bazilari mavi sinir cizgisini gectigi icin artiklarin otokorelasyon problemi vardir deriz.Her bir gecikmeli icin ayri ayri hipotez testi yapilmaktadir.Bu durum da 1.tip Hatayi arttirmaktadir.1.Tip Hatayi arttirmamak icin  birkac gecikmeliyi ayni anda kontrol edebiliriz.
+Bu kontrolu Portmanteau Testleri olan Box-Pierce ve Ljung-Box ile yapariz.
+
+* 3. Grafik Artiklarin Normal Dagilim Grafigidir.Grafige baktigimizda artiklar normal dagiliyor gibi gozukmemektedir,normallik testi grafigimizden daha guvenilir oldugu icin normalligi test etmemiz gerekmektedir. Gozlem sayisimiz 50 nin uzerinde oldugu icin Kolmogorov-Smirnov Testi ile normallige bakabiliriz.
+
+Checkresiduals kodumuzdaki Ljung-Box test sonucumuza gore kullanilan toplam gecikme sayisi 19 cikmistir.
+
+### PORTMANTEAU TESTLERI 
+
+H0:Beyaz gurultu serisidir.(Otokorelasyon problemi yoktur.)
+
+H1:Beyaz gurultu serisi degildir.(Otokorelasyon problemi vardir.)
+
+### BOX-PIERCE TESTI
+
+```{r message=FALSE, warning=FALSE}
+Box.test(residuals(rwf(data_train,h=12, drift=TRUE)),lag=10, fitdf=0)
+```
+
+Box-Pierce Testimizin sonucuna baktigimizda p-value degerimiz yaklasik 0 cikmistir. P-value degerimiz 0.05 den kucuk oldugu icin H0 hipotezi red edilir yani seri beyaz gurultu serisi degildir otokorelasyon problemi vardir.
+
+### LJUNG-BOX TESTI
+
+```{r message=FALSE, warning=FALSE}
+Box.test(residuals(rwf(data_train,h=12, drift=TRUE)),lag=10, fitdf=0, type="Lj")
+```
+
+Ljung-Box Testimizin sonucuna baktigimizda p-value degerimiz yaklasik 0 cikmistir. P-value degerimiz 0.05 den kucuk oldugu icin H0 hipotezi red edilir yani seri beyaz gurultu serisi degildir otokorelasyon problemi vardir.
+
+Ljung-Box Testi , Box-Pierce Testinden daha guvenilir oldugu icin Ljung-Box testini kullaniriz.
+
+## f)
+
+**Naive modelin artiklari icin normallik varsayimini test ediniz, test sonucunuza gore, test seti uzerindeki tahminleriniz icin uygun %80 lik tahmin araligini belirleyiniz.**
+
+Verimizde Naive modelimizin artiklari icin normallik varsayimini Kolmogorov-Smirnov Testi ile test edelim;
+
+### KOLMOGOROV-SMIRNOV TESTI
+
+H0:Artiklarin dagilimi normaldir.
+
+H1:Artiklarin dagilimi normal degildir.
+
+Naive modelin artiklarinin normal dagilip dagilmadigini kontrol edelim;
+
+```{r message=FALSE, warning=FALSE}
+x<-na.omit(residuals(rwf(data_train,h=12, drift=TRUE)))
+ks.test(x,"pnorm", mean=mean(x), sd=sd(x))
+```
+
+Kolmogorov-Smirnov Testimizin sonucuna baktigimizda p-value degerimiz 0.7283 cikmistir. P-value degerimiz 0.05 den buyuk oldugu icin H0 hipotezi kabul edilir yani artiklarimizin dagilimi normaldir.
+
+Verimizde test seti uzerindeki tahminlerimiz icin uygun %80 lik tahmin araliklarini gosterelim ;
+
+```{r message=FALSE, warning=FALSE}
+naive(data_test)
+```
+
+Kolmogorov-Smirnov testimizin sonucuna gore artiklarimizin dagilimi normal oldugundan Naive metodu tahmin yontemi hatalari normal bir dagilim sagladigi icin Bootstrap yontemini kullanmayacagiz.
+
+# **SORU-4:**
+
+**Training set uzerinde regresyon modeli kurarak trend ve mevsimselligi inceleyiniz. Modelin test ve training set uzerindeki tahmin performansini incelemek icin zaman serisi grafigi cizdiriniz. Test seti icin RMSE degerini hesaplayiniz.**
+
+Oncelikle training set uzerinde regresyon modeli kurarak trend ve mevsimselligi inceleyim;
+
+```{r message=FALSE, warning=FALSE}
+fit.train <- tslm(data_train ~ trend + season)
+summary(fit.train)
+```
+
+Kurdugumuz regresyon modelimizin ozetine baktigimizda F istatistigi icin p value degerimiz yaklasik 0 cikmistir.P-value degerimiz 0.05 ten kucuk oldugu icin kurulan regresyon modelimiz anlamlidir.
+
+Burada trend degiskenimiz az da olsa anlamli cikmistir.Yani cok hafif de olsa trend vardir.
+
+Ayni zamanda summary sonucumuza gore Ocak ayi baz alinmistir.Subat ve Aralik aylari ile baz alinan Ocak ayi arasinda anlamli farklilik yoktur.
+
+Simdi de train seti uzerinde kurulan regresyon modeli icin tahminlerin yillara ve sicakliklara gore Aylik Hava Sicakligi grafigini cizdirelim ;
+
+```{r message=FALSE, warning=FALSE}
+autoplot(data_train, series="Data") +
+autolayer(fitted(fit.train), series="Fitted") +
+xlab("Yil") + ylab("Sicaklik") +
+ggtitle("Aylik Hava Sicakligi")
+```
+
+Bu grafigimize baktigimizda kirmizi ile gozukenler orjinal seri ve mavi ile gozukenler ise regresyon modelimizin bize verdigi tahmin degerleridir.Ayrica grafikte outlier gozukmektedir ama genel olarak verimizi iyi tahmin etmistir.
+
+Test seti icin RMSE degerini hesaplayalim;
+
+```{r message=FALSE, warning=FALSE}
+library(ModelMetrics)
+predictions <- fit.train %>% predict(data_test)
+rmse(data_test,predictions)
+```
+
+Test seti icin hesaplanan RMSE degerimiz 1.331864 cikmistir.
+
+
+
+
+
